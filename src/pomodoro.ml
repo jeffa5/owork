@@ -1,5 +1,6 @@
 open Cmdliner
 
+(** State of the timer *)
 type state = IDLE | WORKING | SHORT_BREAK | LONG_BREAK
 
 let state_to_string = function
@@ -8,6 +9,7 @@ let state_to_string = function
   | SHORT_BREAK -> "Short"
   | LONG_BREAK -> "Long"
 
+(** Type of the server config, store state and program arguments *)
 type config =
   { mutable state: state (* State of the timer *)
   ; mutable paused: bool (* Pause the timer *)
@@ -20,6 +22,7 @@ type config =
   ; number_work_sessions: int
   ; mutable work_sessions_completed: int }
 
+(** Send a notification through the system handler with a low urgency *)
 let notify body =
   let%lwt _ =
     Lwt_unix.system @@ "notify-send --urgency=low \"Pomodoro timer\" \"" ^ body
@@ -27,6 +30,7 @@ let notify body =
   in
   Lwt.return_unit
 
+(** Write the config out to file along with the duration and length *)
 let write_config config duration length =
   Lwt_io.with_file ~mode:Output "/home/andrew/.ocaml-pomodoro" (fun channel ->
       let state_string = state_to_string !config.state in
@@ -42,6 +46,7 @@ let write_config config duration length =
            (int_of_float (float duration /. float length *. 100.0))
            (string_of_bool !config.paused) )
 
+(** Wait for the timer to be unpaused *)
 let wait_for_unpause config =
   let rec aux () =
     if !config.paused then
@@ -52,8 +57,10 @@ let wait_for_unpause config =
   in
   aux ()
 
+(** Type for the sleep function to return *)
 type sleep_result = Complete | Reset | Restart
 
+(** Sleep for the given duration and update every second check for pause or other event which cancels the timer *)
 let sleep config duration =
   let sleep_length = Duration.to_sec duration in
   let write_state = write_config config in
@@ -72,6 +79,7 @@ let sleep config duration =
   let%lwt () = write_state (Duration.to_sec duration) sleep_length in
   sleep_duration @@ Duration.to_sec duration
 
+(** Handle the states repeatedly. This is the main driver of the program *)
 let handle_state config =
   let rec aux () =
     match !config.state with
@@ -79,8 +87,8 @@ let handle_state config =
         let%lwt () = write_config config 0 0 in
         let%lwt () = wait_for_unpause config in
         !config.state <- WORKING ;
-        !config.reset <- false;
-        !config.restart <- false;
+        !config.reset <- false ;
+        !config.restart <- false ;
         aux ()
     | WORKING ->
         let%lwt () = notify "Starting work session" in
@@ -140,6 +148,7 @@ let handle_state config =
   in
   aux ()
 
+(** The server which creates and registers with the socket and then listens to handle client connections *)
 let server config =
   Lwt_io.establish_server_with_client_address
     (Unix.ADDR_UNIX "/home/andrew/.ocaml-pomodoro.sock")
@@ -157,6 +166,7 @@ let server config =
           Lwt.return_unit
       | _ -> Lwt.return_unit )
 
+(** Stop the server and remove any other items when shutting down *)
 let stop server =
   print_endline "\rStopping" ;
   Lwt_main.run
@@ -164,6 +174,7 @@ let stop server =
      Lwt_unix.unlink "/home/andrew/.ocaml-pomodoro") ;
   exit 0
 
+(** Given the program arguments create the config and start the server before handling the state *)
 let main work_duration short_break_duration long_break_duration
     number_work_sessions =
   print_endline "Starting pomodoro server" ;
@@ -200,7 +211,7 @@ let number_work_sessions =
   let doc = "Number of work sessions to be completed before a long break." in
   Arg.(value & opt int 3 & info ["n"; "number-work-sessions"] ~doc)
 
-let something =
+let program =
   Term.(
     const main $ work_duration $ short_break_duration $ long_break_duration
     $ number_work_sessions)
@@ -209,4 +220,4 @@ let info =
   let doc = "A pomodoro timing server." in
   Term.info "pomodoro" ~doc ~exits:Term.default_exits
 
-let () = Term.exit @@ Term.eval (something, info)
+let () = Term.exit @@ Term.eval (program, info)
