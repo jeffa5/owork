@@ -1,1 +1,5 @@
-(executable (name pomodoro) (libraries lwt lwt.unix sexplib duration cmdliner) (preprocess (pps lwt_ppx ppx_sexp_conv)))
+(executable
+ (name pomodoro)
+ (libraries lwt lwt.unix sexplib duration cmdliner)
+ (preprocess
+  (pps lwt_ppx ppx_sexp_conv)))
