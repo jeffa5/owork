@@ -49,7 +49,9 @@ let write_config config duration length =
 (** Wait for the timer to be unpaused *)
 let wait_for_unpause config =
   let rec aux () =
-    if !config.paused then
+    if !config.reset then Lwt.return_unit
+    else if !config.restart then Lwt.return_unit
+    else if !config.paused then
       let%lwt () = Lwt_unix.sleep 0.1 in
       let%lwt () = Lwt_unix.yield () in
       aux ()
@@ -66,14 +68,15 @@ let sleep config duration =
   let write_state = write_config config in
   let rec sleep_duration duration =
     if duration > 0 then
-      let%lwt () = Lwt_unix.sleep 1.0 in
-      let%lwt () = write_state (duration - 1) sleep_length in
       let%lwt () =
         if !config.paused then wait_for_unpause config else Lwt.return_unit
       in
       if !config.reset then Lwt.return Reset
       else if !config.restart then Lwt.return Restart
-      else sleep_duration (duration - 1)
+      else
+        let%lwt () = Lwt_unix.sleep 1.0 in
+        let%lwt () = write_state (duration - 1) sleep_length in
+        sleep_duration (duration - 1)
     else Lwt.return Complete
   in
   let%lwt () = write_state (Duration.to_sec duration) sleep_length in
@@ -81,6 +84,18 @@ let sleep config duration =
 
 (** Handle the states repeatedly. This is the main driver of the program *)
 let handle_state config =
+  let reset () =
+    !config.work_sessions_completed <- 0 ;
+    !config.paused <- true ;
+    !config.reset <- false ;
+    let%lwt () = notify "Reset timer" in
+    Lwt.return IDLE
+  in
+  let restart () =
+    !config.restart <- false ;
+    let%lwt () = notify "Restarted session" in
+    Lwt.return !config.state
+  in
   let rec aux () =
     match !config.state with
     | IDLE ->
@@ -94,14 +109,8 @@ let handle_state config =
         let%lwt () = notify "Starting work session" in
         let%lwt new_state =
           match%lwt sleep config !config.work_duration with
-          | Reset ->
-              !config.work_sessions_completed <- 0 ;
-              !config.paused <- true ;
-              !config.reset <- false ;
-              Lwt.return IDLE
-          | Restart ->
-              !config.restart <- false ;
-              Lwt.return WORKING
+          | Reset -> reset ()
+          | Restart -> restart ()
           | Complete ->
               !config.work_sessions_completed
               <- !config.work_sessions_completed + 1 ;
@@ -119,13 +128,8 @@ let handle_state config =
         let%lwt () = notify "Starting short break" in
         let%lwt new_state =
           match%lwt sleep config !config.short_break_duration with
-          | Reset ->
-              !config.paused <- true ;
-              !config.reset <- false ;
-              Lwt.return IDLE
-          | Restart ->
-              !config.restart <- false ;
-              Lwt.return SHORT_BREAK
+          | Reset -> reset ()
+          | Restart -> restart ()
           | Complete -> Lwt.return WORKING
         in
         !config.state <- new_state ;
@@ -134,13 +138,8 @@ let handle_state config =
         let%lwt () = notify "Starting long break" in
         let%lwt new_state =
           match%lwt sleep config !config.long_break_duration with
-          | Reset ->
-              !config.paused <- true ;
-              !config.reset <- false ;
-              Lwt.return IDLE
-          | Restart ->
-              !config.restart <- false ;
-              Lwt.return LONG_BREAK
+          | Reset -> reset ()
+          | Restart -> restart ()
           | Complete -> Lwt.return WORKING
         in
         !config.state <- new_state ;
