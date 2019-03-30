@@ -214,7 +214,7 @@ let number_work_sessions =
 
 let notify_script =
   let doc = "Location of the script to handle the notifications." in
-  Arg.(required & opt (some file) None & info ["notify"] ~doc)
+  Arg.(required & pos 0 (some file) None & info [] ~doc)
 
 let program =
   Term.(
