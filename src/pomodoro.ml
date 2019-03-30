@@ -31,7 +31,8 @@ let notify config body =
 
 (** Write the config out to file along with the duration and length *)
 let write_config config duration length =
-  Lwt_io.with_file ~mode:Output "/home/andrew/.ocaml-pomodoro" (fun channel ->
+  let home = Sys.getenv "HOME" in
+  Lwt_io.with_file ~mode:Output (home ^ "/.ocaml-pomodoro") (fun channel ->
       let state_string = state_to_string !config.state in
       let first_line =
         match !config.state with
@@ -146,8 +147,9 @@ let handle_state config =
 
 (** The server which creates and registers with the socket and then listens to handle client connections *)
 let server config =
+  let home = Sys.getenv "HOME" in
   Lwt_io.establish_server_with_client_address
-    (Unix.ADDR_UNIX "/home/andrew/.ocaml-pomodoro.sock")
+    (Unix.ADDR_UNIX (home ^ "/.ocaml-pomodoro.sock"))
     (fun _addr (ic, _oc) ->
       let%lwt str = Lwt_io.read_line_opt ic in
       match str with
@@ -167,7 +169,8 @@ let stop server =
   print_endline "\rStopping" ;
   Lwt_main.run
     (let%lwt () = Lwt_io.shutdown_server server in
-     Lwt_unix.unlink "/home/andrew/.ocaml-pomodoro") ;
+     let home = Sys.getenv "HOME" in
+     Lwt_unix.unlink (home ^ "/.ocaml-pomodoro")) ;
   exit 0
 
 (** Given the program arguments create the config and start the server before handling the state *)
