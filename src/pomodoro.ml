@@ -9,13 +9,13 @@ let state_to_string = function
   | SHORT_BREAK -> "Short"
   | LONG_BREAK -> "Long"
 
+type interruption = None | Pause | Reset | Restart | Skip
+
 (** Type of the server config, store state and program arguments *)
 type config =
   { mutable state: state (* State of the timer *)
   ; mutable paused: bool (* Pause the timer *)
-  ; mutable reset:
-      bool (* Reset the timer to idle and number of work sessions *)
-  ; mutable restart: bool (* Restart the current session *)
+  ; mutable interruption: interruption
   ; work_duration: Duration.t
   ; short_break_duration: Duration.t
   ; long_break_duration: Duration.t
@@ -25,7 +25,7 @@ type config =
 
 (** Send a notification using a user-configured script *)
 let notify config body =
-  let command = Printf.sprintf "./%s \"%s\"" !config.notify_script body in
+  let command = Printf.sprintf "%s \"%s\"" !config.notify_script body in
   let%lwt _ = Lwt_unix.system command in
   Lwt.return_unit
 
@@ -49,18 +49,21 @@ let write_config config duration length =
 (** Wait for the timer to be unpaused *)
 let wait_for_unpause config =
   let rec aux () =
-    if !config.reset then Lwt.return_unit
-    else if !config.restart then Lwt.return_unit
-    else if !config.paused then
-      let%lwt () = Lwt_unix.sleep 0.1 in
-      let%lwt () = Lwt_unix.yield () in
-      aux ()
-    else Lwt.return_unit
+    match !config.interruption with
+    | None ->
+        let%lwt () = Lwt_unix.sleep 0.1 in
+        let%lwt () = Lwt_unix.yield () in
+        aux ()
+    | Pause ->
+        !config.paused <- false ;
+        !config.interruption <- None ;
+        Lwt.return_unit
+    | Reset | Restart | Skip -> Lwt.return_unit
   in
-  aux ()
+  if !config.paused then aux () else Lwt.return_unit
 
 (** Type for the sleep function to return *)
-type sleep_result = Complete | Reset | Restart
+type sleep_result = Complete | Reset | Restart | Skip
 
 (** Sleep for the given duration and update every second check for pause or other event which cancels the timer *)
 let sleep config duration =
@@ -68,15 +71,26 @@ let sleep config duration =
   let write_state = write_config config in
   let rec sleep_duration duration =
     if duration > 0 then
-      let%lwt () =
-        if !config.paused then wait_for_unpause config else Lwt.return_unit
-      in
-      if !config.reset then Lwt.return Reset
-      else if !config.restart then Lwt.return Restart
-      else
-        let%lwt () = Lwt_unix.sleep 1.0 in
-        let%lwt () = write_state (duration - 1) sleep_length in
-        sleep_duration (duration - 1)
+      match !config.interruption with
+      | None ->
+          let%lwt () = wait_for_unpause config in
+          let%lwt () = Lwt_unix.sleep 1.0 in
+          let%lwt () = write_state (duration - 1) sleep_length in
+          sleep_duration (duration - 1)
+      | Pause ->
+          !config.paused <- true ;
+          !config.interruption <- None ;
+          let%lwt () = write_state duration sleep_length in
+          let%lwt () = wait_for_unpause config in
+          sleep_duration duration
+      | Reset -> Lwt.return Reset
+      | Restart -> Lwt.return Restart
+      | Skip -> (
+        match !config.state with
+        | IDLE | WORKING ->
+            !config.interruption <- None ;
+            sleep_duration duration
+        | SHORT_BREAK | LONG_BREAK -> Lwt.return Skip )
     else Lwt.return Complete
   in
   let%lwt () = write_state (Duration.to_sec duration) sleep_length in
@@ -87,12 +101,22 @@ let handle_state config =
   let reset () =
     !config.work_sessions_completed <- 0 ;
     !config.paused <- true ;
-    !config.reset <- false ;
+    !config.interruption <- None ;
     Lwt.return IDLE
   in
   let restart () =
-    !config.restart <- false ;
+    !config.interruption <- None ;
+    !config.paused <- false ;
     Lwt.return !config.state
+  in
+  let skip () =
+    !config.interruption <- None ;
+    match !config.state with
+    | IDLE -> Lwt.return IDLE (* Can't skip past idle *)
+    | WORKING -> Lwt.return WORKING (* Can't skip a work session *)
+    | SHORT_BREAK -> Lwt.return WORKING (* Skip to start of work session *)
+    | LONG_BREAK -> Lwt.return WORKING
+    (* Skip to start of work session *)
   in
   let rec aux () =
     match !config.state with
@@ -100,8 +124,7 @@ let handle_state config =
         let%lwt () = write_config config 0 0 in
         let%lwt () = wait_for_unpause config in
         !config.state <- WORKING ;
-        !config.reset <- false ;
-        !config.restart <- false ;
+        !config.interruption <- None ;
         aux ()
     | WORKING ->
         let%lwt () = notify config "Starting work session" in
@@ -109,6 +132,7 @@ let handle_state config =
           match%lwt sleep config !config.work_duration with
           | Reset -> reset ()
           | Restart -> restart ()
+          | Skip -> skip ()
           | Complete ->
               !config.work_sessions_completed
               <- !config.work_sessions_completed + 1 ;
@@ -128,6 +152,7 @@ let handle_state config =
           match%lwt sleep config !config.short_break_duration with
           | Reset -> reset ()
           | Restart -> restart ()
+          | Skip -> skip ()
           | Complete -> Lwt.return WORKING
         in
         !config.state <- new_state ;
@@ -138,6 +163,7 @@ let handle_state config =
           match%lwt sleep config !config.long_break_duration with
           | Reset -> reset ()
           | Restart -> restart ()
+          | Skip -> skip ()
           | Complete -> Lwt.return WORKING
         in
         !config.state <- new_state ;
@@ -154,15 +180,21 @@ let server config =
       let%lwt str = Lwt_io.read_line_opt ic in
       match str with
       | Some "pause" ->
-          !config.paused <- not !config.paused ;
+          !config.interruption <- Pause ;
           Lwt.return_unit
       | Some "reset" ->
-          !config.reset <- true ;
+          !config.interruption <- Reset ;
           Lwt.return_unit
       | Some "restart" ->
-          !config.restart <- true ;
+          !config.interruption <- Restart ;
           Lwt.return_unit
-      | _ -> Lwt.return_unit )
+      | Some "skip" ->
+          !config.interruption <- Skip ;
+          Lwt.return_unit
+      | Some str ->
+          print_endline @@ "Unexpected string received: " ^ str ;
+          Lwt.return_unit
+      | None -> Lwt.return_unit )
 
 (** Stop the server and remove any other items when shutting down *)
 let stop server =
@@ -181,8 +213,7 @@ let main work_duration short_break_duration long_break_duration
     ref
       { state= IDLE
       ; paused= true
-      ; reset= false
-      ; restart= false
+      ; interruption= None
       ; work_duration= Duration.of_min work_duration
       ; short_break_duration= Duration.of_min short_break_duration
       ; long_break_duration= Duration.of_min long_break_duration
