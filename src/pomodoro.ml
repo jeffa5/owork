@@ -20,14 +20,13 @@ type config =
   ; short_break_duration: Duration.t
   ; long_break_duration: Duration.t
   ; number_work_sessions: int
+  ; notify_script: string
   ; mutable work_sessions_completed: int }
 
-(** Send a notification through the system handler with a low urgency *)
-let notify body =
-  let%lwt _ =
-    Lwt_unix.system @@ "notify-send --urgency=low \"Pomodoro timer\" \"" ^ body
-    ^ "\""
-  in
+(** Send a notification using a user-configured script *)
+let notify config body =
+  let command = Printf.sprintf "./%s \"%s\"" !config.notify_script body in
+  let%lwt _ = Lwt_unix.system command in
   Lwt.return_unit
 
 (** Write the config out to file along with the duration and length *)
@@ -38,8 +37,8 @@ let write_config config duration length =
         match !config.state with
         | IDLE -> state_string
         | _ ->
-            Printf.sprintf "%s %d:%02d" state_string (duration / 60)
-              (duration mod 60)
+            Printf.sprintf "%s %d:%02d %d" state_string (duration / 60)
+              (duration mod 60) !config.work_sessions_completed
       in
       Lwt_io.write channel
       @@ Printf.sprintf "%s\n%d\n%s" first_line
@@ -88,12 +87,10 @@ let handle_state config =
     !config.work_sessions_completed <- 0 ;
     !config.paused <- true ;
     !config.reset <- false ;
-    let%lwt () = notify "Reset timer" in
     Lwt.return IDLE
   in
   let restart () =
     !config.restart <- false ;
-    let%lwt () = notify "Restarted session" in
     Lwt.return !config.state
   in
   let rec aux () =
@@ -106,7 +103,7 @@ let handle_state config =
         !config.restart <- false ;
         aux ()
     | WORKING ->
-        let%lwt () = notify "Starting work session" in
+        let%lwt () = notify config "Starting work session" in
         let%lwt new_state =
           match%lwt sleep config !config.work_duration with
           | Reset -> reset ()
@@ -125,7 +122,7 @@ let handle_state config =
         !config.state <- new_state ;
         aux ()
     | SHORT_BREAK ->
-        let%lwt () = notify "Starting short break" in
+        let%lwt () = notify config "Starting short break" in
         let%lwt new_state =
           match%lwt sleep config !config.short_break_duration with
           | Reset -> reset ()
@@ -135,7 +132,7 @@ let handle_state config =
         !config.state <- new_state ;
         aux ()
     | LONG_BREAK ->
-        let%lwt () = notify "Starting long break" in
+        let%lwt () = notify config "Starting long break" in
         let%lwt new_state =
           match%lwt sleep config !config.long_break_duration with
           | Reset -> reset ()
@@ -175,7 +172,7 @@ let stop server =
 
 (** Given the program arguments create the config and start the server before handling the state *)
 let main work_duration short_break_duration long_break_duration
-    number_work_sessions =
+    number_work_sessions notify_script =
   print_endline "Starting pomodoro server" ;
   let config =
     ref
@@ -187,11 +184,13 @@ let main work_duration short_break_duration long_break_duration
       ; short_break_duration= Duration.of_min short_break_duration
       ; long_break_duration= Duration.of_min long_break_duration
       ; number_work_sessions
+      ; notify_script
       ; work_sessions_completed= 0 }
   in
   Lwt_main.run
     (let%lwt server = server config in
      let _ = Lwt_unix.on_signal Sys.sigint (fun _ -> stop server) in
+     let _ = Lwt_unix.on_signal Sys.sigterm (fun _ -> stop server) in
      handle_state config)
 
 let work_duration =
@@ -210,10 +209,14 @@ let number_work_sessions =
   let doc = "Number of work sessions to be completed before a long break." in
   Arg.(value & opt int 3 & info ["n"; "number-work-sessions"] ~doc)
 
+let notify_script =
+  let doc = "Location of the script to handle the notifications." in
+  Arg.(required & opt (some file) None & info ["notify"] ~doc)
+
 let program =
   Term.(
     const main $ work_duration $ short_break_duration $ long_break_duration
-    $ number_work_sessions)
+    $ number_work_sessions $ notify_script)
 
 let info =
   let doc = "A pomodoro timing server." in
