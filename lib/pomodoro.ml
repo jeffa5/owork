@@ -10,6 +10,8 @@ let state_to_string = function
 (** Type of interruptions for the server part to send *)
 type interruption = Pause | Reset | Restart | Skip [@@deriving show]
 
+type unpause_interruption = Reset | Restart | Skip
+
 (** Type of the server config, store state and program arguments *)
 type config =
   { mutable state: state [@default IDLE]
@@ -44,10 +46,12 @@ let wait_for_unpause config =
     match%lwt Lwt_mvar.take !config.interruption with
     | Pause ->
         !config.paused <- false ;
-        Lwt.return_unit
-    | Reset | Restart | Skip -> Lwt.return_unit
+        Lwt.return_none
+    | Reset -> Lwt.return_some Reset
+    | Restart -> Lwt.return_some Restart
+    | Skip -> Lwt.return_some Skip
   in
-  if !config.paused then aux () else Lwt.return_unit
+  if !config.paused then aux () else Lwt.return_none
 
 (** Type for the sleep function to return *)
 type sleep_result = Complete | Pause | Reset | Restart | Skip
@@ -78,9 +82,12 @@ let sleep config duration =
       Lwt.pick [sleep_in_steps (); wait_for_interruption ()]
     in
     match sleep_result with
-    | Pause ->
-        let%lwt () = wait_for_unpause config in
-        sleep_or_interrupt ()
+    | Pause -> (
+        match%lwt wait_for_unpause config with
+        | None -> sleep_or_interrupt ()
+        | Some Reset -> Lwt.return Reset
+        | Some Restart -> Lwt.return Restart
+        | Some Skip -> Lwt.return Skip )
     | result -> Lwt.return result
   in
   sleep_or_interrupt ()
@@ -104,9 +111,16 @@ let handle_state config =
   let rec aux () =
     match !config.state with
     | IDLE ->
-        let%lwt () = wait_for_unpause config in
-        !config.state <- WORKING ;
-        !config.paused <- false ;
+        let%lwt new_state =
+          match%lwt wait_for_unpause config with
+          | None ->
+              !config.paused <- false ;
+              Lwt.return WORKING
+          | Some Reset -> reset ()
+          | Some Restart -> restart ()
+          | Some Skip -> skip ()
+        in
+        !config.state <- new_state ;
         aux ()
     | WORKING ->
         let%lwt () = notify config "Starting work session" in
@@ -159,6 +173,10 @@ let handle_state config =
 (** The server which creates and registers with the socket and then listens to handle client connections *)
 let server config =
   let home = Sys.getenv "HOME" in
+  let server_file = home ^ "/.ocaml-pomodoro.sock" in
+  let%lwt () =
+    try%lwt Lwt_unix.unlink server_file with _ -> Lwt.return_unit
+  in
   Lwt_io.establish_server_with_client_address
     (Unix.ADDR_UNIX (home ^ "/.ocaml-pomodoro.sock"))
     (fun _addr (ic, oc) ->
@@ -204,8 +222,9 @@ let server config =
 
 (** Stop the server and remove any other items when shutting down *)
 let stop server =
-  print_endline "\rStopping" ;
-  Lwt_main.run (Lwt_io.shutdown_server server) ;
+  Lwt_main.run
+    (let%lwt () = Lwt_io.printl "Stopping" in
+     Lwt_io.shutdown_server server) ;
   exit 0
 
 let test_config () =
@@ -232,7 +251,8 @@ let%expect_test "wait_for_unpause" =
     !config.paused <- true ;
     !config.state <- state ;
     let%lwt () = Lwt_mvar.put !config.interruption interruption in
-    wait_for_unpause config
+    let%lwt _ = wait_for_unpause config in
+    Lwt.return_unit
   in
   Lwt_main.run @@ test IDLE Pause ;
   print_config config ;
