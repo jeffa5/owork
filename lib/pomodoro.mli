@@ -8,6 +8,7 @@ type config =
   ; mutable interruption: interruption Lwt_mvar.t
          [@opaque] [@default Lwt_mvar.create_empty ()]
   ; mutable timer: int [@default 0]
+  ; mutable session_length : int [@default 0]
   ; work_duration: Duration.t
   ; short_break_duration: Duration.t
   ; long_break_duration: Duration.t

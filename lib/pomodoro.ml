@@ -23,6 +23,7 @@ type config =
                | Some interruption -> show_interruption interruption )]
          [@default Lwt_mvar.create_empty ()]
   ; mutable timer: int [@default 0]
+  ; mutable session_length: int [@default 1]
   ; work_duration: Duration.t
   ; short_break_duration: Duration.t
   ; long_break_duration: Duration.t
@@ -36,23 +37,6 @@ let notify config body =
   let command = Printf.sprintf "%s \"%s\"" !config.notify_script body in
   let%lwt _ = Lwt_unix.system command in
   Lwt.return_unit
-
-(** Write the config out to file along with the duration and length *)
-let write_config config duration length =
-  let home = Sys.getenv "HOME" in
-  Lwt_io.with_file ~mode:Output (home ^ "/.ocaml-pomodoro") (fun channel ->
-      let state_string = state_to_string !config.state in
-      let first_line =
-        match !config.state with
-        | IDLE -> state_string
-        | _ ->
-            Printf.sprintf "%s %d:%02d %d" state_string (duration / 60)
-              (duration mod 60) !config.work_sessions_completed
-      in
-      Lwt_io.write channel
-      @@ Printf.sprintf "%s\n%d\n%s" first_line
-           (int_of_float (float duration /. float length *. 100.0))
-           (string_of_bool !config.paused) )
 
 (** Wait for the timer to be unpaused *)
 let wait_for_unpause config =
@@ -70,16 +54,12 @@ type sleep_result = Complete | Pause | Reset | Restart | Skip
 
 (** Sleep for the given duration and update every second check for pause or other event which cancels the timer *)
 let sleep config duration =
-  let debug_print () =
-    Lwt_io.printf "%s %d\n" (state_to_string !config.state) !config.timer
-  in
   let sleep_length = Duration.to_sec duration in
+  !config.session_length <- sleep_length ;
   !config.timer <- sleep_length ;
   let rec sleep_or_interrupt () =
-    let%lwt () = Lwt_io.printl (show_config !config) in
     let rec sleep_in_steps () =
       if !config.timer > 0 then (
-        let%lwt () = debug_print () in
         let%lwt () = Lwt_unix.sleep 1. in
         !config.timer <- !config.timer - 1 ;
         sleep_in_steps () )
@@ -89,7 +69,6 @@ let sleep config duration =
       match%lwt Lwt_mvar.take !config.interruption with
       | Pause ->
           !config.paused <- true ;
-          let%lwt () = Lwt_io.printl (show_config !config) in
           Lwt.return Pause
       | Reset -> Lwt.return Reset
       | Restart -> Lwt.return Restart
@@ -102,9 +81,7 @@ let sleep config duration =
     | Pause ->
         let%lwt () = wait_for_unpause config in
         sleep_or_interrupt ()
-    | result ->
-        let%lwt () = Lwt_io.printl "non pause sleep result" in
-        Lwt.return result
+    | result -> Lwt.return result
   in
   sleep_or_interrupt ()
 
@@ -127,7 +104,6 @@ let handle_state config =
   let rec aux () =
     match !config.state with
     | IDLE ->
-        let%lwt () = write_config config 0 0 in
         let%lwt () = wait_for_unpause config in
         !config.state <- WORKING ;
         !config.paused <- false ;
@@ -185,23 +161,51 @@ let server config =
   let home = Sys.getenv "HOME" in
   Lwt_io.establish_server_with_client_address
     (Unix.ADDR_UNIX (home ^ "/.ocaml-pomodoro.sock"))
-    (fun _addr (ic, _oc) ->
+    (fun _addr (ic, oc) ->
+      let write s =
+        let%lwt () = Lwt_io.write_line oc s in
+        Lwt_io.flush oc
+      in
       let%lwt str = Lwt_io.read_line_opt ic in
-      match str with
-      | Some "pause" -> Lwt_mvar.put !config.interruption Pause
-      | Some "reset" -> Lwt_mvar.put !config.interruption Reset
-      | Some "restart" -> Lwt_mvar.put !config.interruption Restart
-      | Some "skip" -> Lwt_mvar.put !config.interruption Skip
-      | Some str -> Lwt_io.printl ("Unexpected string received: " ^ str)
-      | None -> Lwt.return_unit )
+      let%lwt () =
+        match str with
+        | Some str -> (
+          match String.split_on_char '/' str with
+          | ["set"; query] -> (
+            match query with
+            | "pause" -> Lwt_mvar.put !config.interruption Pause
+            | "reset" -> Lwt_mvar.put !config.interruption Reset
+            | "restart" -> Lwt_mvar.put !config.interruption Restart
+            | "skip" -> Lwt_mvar.put !config.interruption Skip
+            | _ -> write "Invalid keyword" )
+          | ["get"; query] -> (
+            match query with
+            | "state" -> write (state_to_string !config.state)
+            | "time_left" ->
+                write
+                  (Printf.sprintf "%d:%02d" (!config.timer / 60)
+                     (!config.timer mod 60))
+            | "percent_left" ->
+                write
+                  (string_of_int
+                     (int_of_float
+                        ( float !config.timer
+                        /. float !config.session_length
+                        *. 100.0 )))
+            | "sessions_complete" ->
+                write (string_of_int !config.work_sessions_completed)
+            | "pause" -> write (string_of_bool !config.paused)
+            | keyword -> write ("Invalid keyword: " ^ keyword) )
+          | _ -> write "Invalid query, format is (get|set)/(keyword)" )
+        (* | Some str -> Lwt_io.printl ("Unexpected string received: " ^ str) *)
+        | None -> Lwt.return_unit
+      in
+      Lwt_io.flush oc )
 
 (** Stop the server and remove any other items when shutting down *)
 let stop server =
   print_endline "\rStopping" ;
-  Lwt_main.run
-    (let%lwt () = Lwt_io.shutdown_server server in
-     let home = Sys.getenv "HOME" in
-     Lwt_unix.unlink (home ^ "/.ocaml-pomodoro")) ;
+  Lwt_main.run (Lwt_io.shutdown_server server) ;
   exit 0
 
 let test_config () =
