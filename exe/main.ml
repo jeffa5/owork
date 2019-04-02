@@ -16,7 +16,6 @@ let main work_duration short_break_duration long_break_duration
   Lwt_main.run
     (let%lwt server = server config in
      let _ = Lwt_unix.on_signal Sys.sigint (fun _ -> stop server) in
-     let _ = Lwt_unix.on_signal Sys.sigterm (fun _ -> stop server) in
      handle_state config)
 
 let work_duration =
