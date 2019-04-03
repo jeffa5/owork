@@ -104,6 +104,7 @@ let handle_state config =
     Lwt.return !config.state
   in
   let skip () =
+    !config.paused <- false ;
     match !config.state with
     | IDLE -> Lwt.return IDLE
     | WORKING | SHORT_BREAK | LONG_BREAK -> Lwt.return WORKING
