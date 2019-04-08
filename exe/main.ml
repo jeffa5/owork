@@ -1,10 +1,10 @@
 open Cmdliner
-open Pomodoro
+open Productivity_timer.Timer
 
 (** Given the program arguments create the config and start the server before handling the state *)
 let main work_duration short_break_duration long_break_duration
     number_work_sessions notify_script =
-  print_endline "Starting pomodoro server" ;
+  print_endline "Starting timing server" ;
   let config =
     ref
     @@ make_config
@@ -44,7 +44,7 @@ let program =
     $ number_work_sessions $ notify_script)
 
 let info =
-  let doc = "A pomodoro timing server." in
-  Term.info "pomodoro" ~doc ~exits:Term.default_exits
+  let doc = "A productivity timing server." in
+  Term.info "productivity-timer" ~doc ~exits:Term.default_exits
 
 let () = Term.exit @@ Term.eval (program, info)

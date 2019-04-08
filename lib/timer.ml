@@ -174,12 +174,12 @@ let handle_state config =
 (** The server which creates and registers with the socket and then listens to handle client connections *)
 let server config =
   let home = Sys.getenv "HOME" in
-  let server_file = home ^ "/.ocaml-pomodoro.sock" in
+  let server_file = home ^ "/.ocaml-productivity-timer.sock" in
   let%lwt () =
     try%lwt Lwt_unix.unlink server_file with _ -> Lwt.return_unit
   in
   Lwt_io.establish_server_with_client_address
-    (Unix.ADDR_UNIX (home ^ "/.ocaml-pomodoro.sock"))
+    (Unix.ADDR_UNIX (home ^ "/.ocaml-productivity-timer.sock"))
     (fun _addr (ic, oc) ->
       let write s =
         let%lwt () = Lwt_io.write_line oc s in
@@ -241,7 +241,7 @@ let%expect_test "initial config" =
   print_config @@ test_config () ;
   [%expect
     {|
-    { Pomodoro.state = Pomodoro.IDLE; paused = true; interruption = None;
+    { Timer.state = Timer.IDLE; paused = true; interruption = None;
       timer = 0; work_duration = 25 minutes ; short_break_duration = 5 minutes ;
       long_break_duration = 30 minutes ; number_work_sessions = 3;
       notify_script = "some/script/notify"; work_sessions_completed = 0 } |}]
@@ -259,7 +259,7 @@ let%expect_test "wait_for_unpause" =
   print_config config ;
   [%expect
     {|
-    { Pomodoro.state = Pomodoro.IDLE; paused = false; interruption = None;
+    { Timer.state = Timer.IDLE; paused = false; interruption = None;
       timer = 0; work_duration = 25 minutes ; short_break_duration = 5 minutes ;
       long_break_duration = 30 minutes ; number_work_sessions = 3;
       notify_script = "some/script/notify"; work_sessions_completed = 0 } |}] ;
@@ -267,7 +267,7 @@ let%expect_test "wait_for_unpause" =
   print_config config ;
   [%expect
     {|
-    { Pomodoro.state = Pomodoro.IDLE; paused = true; interruption = None;
+    { Timer.state = Timer.IDLE; paused = true; interruption = None;
       timer = 0; work_duration = 25 minutes ; short_break_duration = 5 minutes ;
       long_break_duration = 30 minutes ; number_work_sessions = 3;
       notify_script = "some/script/notify"; work_sessions_completed = 0 } |}] ;
@@ -275,7 +275,7 @@ let%expect_test "wait_for_unpause" =
   print_config config ;
   [%expect
     {|
-    { Pomodoro.state = Pomodoro.IDLE; paused = true; interruption = None;
+    { Timer.state = Timer.IDLE; paused = true; interruption = None;
       timer = 0; work_duration = 25 minutes ; short_break_duration = 5 minutes ;
       long_break_duration = 30 minutes ; number_work_sessions = 3;
       notify_script = "some/script/notify"; work_sessions_completed = 0 } |}] ;
@@ -283,7 +283,7 @@ let%expect_test "wait_for_unpause" =
   print_config config ;
   [%expect
     {|
-    { Pomodoro.state = Pomodoro.IDLE; paused = true; interruption = None;
+    { Timer.state = Timer.IDLE; paused = true; interruption = None;
       timer = 0; work_duration = 25 minutes ; short_break_duration = 5 minutes ;
       long_break_duration = 30 minutes ; number_work_sessions = 3;
       notify_script = "some/script/notify"; work_sessions_completed = 0 } |}]

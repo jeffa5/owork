@@ -1,5 +1,5 @@
 (library
- (name pomodoro)
+ (name productivity_timer)
  (libraries lwt lwt.unix sexplib duration cmdliner)
  (inline_tests (flags -show-counts -strict))
  (preprocess
