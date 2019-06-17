@@ -1,7 +1,7 @@
 open Cmdliner
 open Owork_timer.Timer
 
-(** Given the program arguments create the config and start the server before handling the state *)
+(** Given the command line arguments create the config and start the server before handling the state *)
 let main work_duration short_break_duration long_break_duration
     number_work_sessions notify_script =
   print_endline "Starting timing server" ;
@@ -32,11 +32,11 @@ let long_break_duration =
 
 let number_work_sessions =
   let doc = "Number of work sessions to be completed before a long break." in
-  Arg.(value & opt int 3 & info ["n"; "number-work-sessions"] ~doc)
+  Arg.(value & opt int 3 & info ["n"; "work-sessions"] ~doc)
 
 let notify_script =
   let doc = "Location of the script to handle the notifications." in
-  Arg.(value & pos 0 (some file) None & info [] ~docv:"NOTIFY" ~doc)
+  Arg.(value & opt (some file) None & info ["notify-script"] ~doc)
 
 let program =
   Term.(
