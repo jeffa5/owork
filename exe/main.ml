@@ -1,5 +1,5 @@
 open Cmdliner
-open Productivity_timer.Timer
+open Owork_timer.Timer
 
 (** Given the program arguments create the config and start the server before handling the state *)
 let main work_duration short_break_duration long_break_duration

@@ -1,5 +1,5 @@
 (library
- (name productivity_timer)
+ (name owork_timer)
  (libraries lwt lwt.unix sexplib duration cmdliner)
  (inline_tests (flags -show-counts -strict))
  (preprocess

@@ -1,5 +1,5 @@
 (executable
  (name main)
- (libraries productivity_timer lwt lwt.unix sexplib duration cmdliner)
+ (libraries owork_timer lwt lwt.unix sexplib duration cmdliner)
  (preprocess
   (pps lwt_ppx ppx_sexp_conv)))
