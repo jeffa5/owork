@@ -6,14 +6,14 @@ type config =
   { mutable state: state [@default IDLE]
   ; mutable paused: bool [@default true]
   ; mutable interruption: interruption Lwt_mvar.t
-         [@opaque] [@default Lwt_mvar.create_empty ()]
+        [@opaque] [@default Lwt_mvar.create_empty ()]
   ; mutable timer: int [@default 0]
-  ; mutable session_length : int [@default 0]
+  ; mutable session_length: int [@default 0]
   ; work_duration: Duration.t
   ; short_break_duration: Duration.t
   ; long_break_duration: Duration.t
   ; number_work_sessions: int
-  ; notify_script: string
+  ; notify_script: string option [@default None]
   ; mutable work_sessions_completed: int [@default 0] }
 [@@deriving make, show]
 

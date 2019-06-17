@@ -36,15 +36,19 @@ type config =
   ; short_break_duration: Duration.t
   ; long_break_duration: Duration.t
   ; number_work_sessions: int
-  ; notify_script: string
+  ; notify_script: string option [@default None]
   ; mutable work_sessions_completed: int [@default 0] }
 [@@deriving make, show]
 
 (** Send a notification using a user-configured script *)
 let notify config body =
-  let command = Printf.sprintf "%s \"%s\"" !config.notify_script body in
-  let%lwt _ = Lwt_unix.system command in
-  Lwt.return_unit
+  match !config.notify_script with
+  | Some notify_script ->
+      let command = Printf.sprintf "%s \"%s\"" notify_script body in
+      let%lwt _ = Lwt_unix.system command in
+      Lwt.return_unit
+  | None ->
+      Lwt.return_unit
 
 (** Wait for the timer to be unpaused *)
 let wait_for_unpause config =
@@ -279,7 +283,7 @@ let test_config () =
   make_config ~work_duration:(Duration.of_min 25)
     ~short_break_duration:(Duration.of_min 5)
     ~long_break_duration:(Duration.of_min 30) ~number_work_sessions:3
-    ~notify_script:"some/script/notify" ()
+    ~notify_script:(Some "some/script/notify") ()
   |> ref
 
 let print_config config_ref = print_endline (show_config !config_ref)
