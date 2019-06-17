@@ -7,7 +7,7 @@ let main work_duration short_break_duration long_break_duration
   print_endline "Starting timing server" ;
   let config =
     ref
-    @@ make_config
+    @@ make_server_config
          ~work_duration:(Duration.of_min work_duration)
          ~short_break_duration:(Duration.of_min short_break_duration)
          ~long_break_duration:(Duration.of_min long_break_duration)

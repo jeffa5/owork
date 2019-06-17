@@ -14,10 +14,11 @@ let state_to_string = function
 (** Type of interruptions for the server part to send *)
 type interruption = Pause | Reset | Restart | Skip [@@deriving show]
 
+(** Interruptions to wait for when unpausing *)
 type unpause_interruption = Reset | Restart | Skip
 
 (** Type of the server config, store state and program arguments *)
-type config =
+type server_config =
   { mutable state: state [@default IDLE]
   ; mutable paused: bool [@default true]
   ; mutable interruption: interruption Lwt_mvar.t
@@ -41,8 +42,8 @@ type config =
 [@@deriving make, show]
 
 (** Send a notification using a user-configured script *)
-let notify config body =
-  match !config.notify_script with
+let notify server_config body =
+  match !server_config.notify_script with
   | Some notify_script ->
       let command = Printf.sprintf "%s \"%s\"" notify_script body in
       let%lwt _ = Lwt_unix.system command in
@@ -51,11 +52,11 @@ let notify config body =
       Lwt.return_unit
 
 (** Wait for the timer to be unpaused *)
-let wait_for_unpause config =
+let wait_for_unpause server_config =
   let aux () =
-    match%lwt Lwt_mvar.take !config.interruption with
+    match%lwt Lwt_mvar.take !server_config.interruption with
     | Pause ->
-        !config.paused <- false ;
+        !server_config.paused <- false ;
         Lwt.return_none
     | Reset ->
         Lwt.return_some Reset
@@ -64,28 +65,28 @@ let wait_for_unpause config =
     | Skip ->
         Lwt.return_some Skip
   in
-  if !config.paused then aux () else Lwt.return_none
+  if !server_config.paused then aux () else Lwt.return_none
 
 (** Type for the sleep function to return *)
 type sleep_result = Complete | Pause | Reset | Restart | Skip
 
 (** Sleep for the given duration and update every second check for pause or other event which cancels the timer *)
-let sleep config duration =
+let sleep server_config duration =
   let sleep_length = Duration.to_sec duration in
-  !config.session_length <- sleep_length ;
-  !config.timer <- sleep_length ;
+  !server_config.session_length <- sleep_length ;
+  !server_config.timer <- sleep_length ;
   let rec sleep_or_interrupt () =
     let rec sleep_in_steps () =
-      if !config.timer > 0 then (
+      if !server_config.timer > 0 then (
         let%lwt () = Lwt_unix.sleep 1. in
-        !config.timer <- !config.timer - 1 ;
+        !server_config.timer <- !server_config.timer - 1 ;
         sleep_in_steps () )
       else Lwt.return Complete
     in
     let wait_for_interruption () =
-      match%lwt Lwt_mvar.take !config.interruption with
+      match%lwt Lwt_mvar.take !server_config.interruption with
       | Pause ->
-          !config.paused <- true ;
+          !server_config.paused <- true ;
           Lwt.return Pause
       | Reset ->
           Lwt.return Reset
@@ -99,7 +100,7 @@ let sleep config duration =
     in
     match sleep_result with
     | Pause -> (
-        match%lwt wait_for_unpause config with
+        match%lwt wait_for_unpause server_config with
         | None ->
             sleep_or_interrupt ()
         | Some Reset ->
@@ -114,26 +115,26 @@ let sleep config duration =
   sleep_or_interrupt ()
 
 (** Handle the states repeatedly. This is the main driver of the program *)
-let handle_state config =
+let handle_state server_config =
   let reset () =
-    !config.work_sessions_completed <- 0 ;
-    !config.paused <- true ;
+    !server_config.work_sessions_completed <- 0 ;
+    !server_config.paused <- true ;
     Lwt.return IDLE
   in
   let restart () =
-    !config.paused <- false ;
-    Lwt.return !config.state
+    !server_config.paused <- false ;
+    Lwt.return !server_config.state
   in
   let work_complete () =
-    !config.work_sessions_completed <- !config.work_sessions_completed + 1 ;
-    ( if !config.work_sessions_completed mod !config.number_work_sessions == 0
+    !server_config.work_sessions_completed <- !server_config.work_sessions_completed + 1 ;
+    ( if !server_config.work_sessions_completed mod !server_config.number_work_sessions == 0
     then LONG_BREAK
     else SHORT_BREAK )
     |> Lwt.return
   in
   let skip () =
-    !config.paused <- false ;
-    match !config.state with
+    !server_config.paused <- false ;
+    match !server_config.state with
     | IDLE ->
         Lwt.return IDLE
     | WORKING ->
@@ -142,12 +143,12 @@ let handle_state config =
         Lwt.return WORKING
   in
   let rec aux () =
-    match !config.state with
+    match !server_config.state with
     | IDLE ->
         let%lwt new_state =
-          match%lwt wait_for_unpause config with
+          match%lwt wait_for_unpause server_config with
           | None ->
-              !config.paused <- false ;
+              !server_config.paused <- false ;
               Lwt.return WORKING
           | Some Reset ->
               reset ()
@@ -156,12 +157,12 @@ let handle_state config =
           | Some Skip ->
               skip ()
         in
-        !config.state <- new_state ;
+        !server_config.state <- new_state ;
         aux ()
     | WORKING ->
-        let%lwt () = notify config "Starting work session" in
+        let%lwt () = notify server_config "Starting work session" in
         let%lwt new_state =
-          match%lwt sleep config !config.work_duration with
+          match%lwt sleep server_config !server_config.work_duration with
           | Pause ->
               Lwt.return WORKING
           | Reset ->
@@ -173,12 +174,12 @@ let handle_state config =
           | Complete ->
               work_complete ()
         in
-        !config.state <- new_state ;
+        !server_config.state <- new_state ;
         aux ()
     | SHORT_BREAK ->
-        let%lwt () = notify config "Starting short break" in
+        let%lwt () = notify server_config "Starting short break" in
         let%lwt new_state =
-          match%lwt sleep config !config.short_break_duration with
+          match%lwt sleep server_config !server_config.short_break_duration with
           | Pause ->
               Lwt.return SHORT_BREAK
           | Reset ->
@@ -190,12 +191,12 @@ let handle_state config =
           | Complete ->
               Lwt.return WORKING
         in
-        !config.state <- new_state ;
+        !server_config.state <- new_state ;
         aux ()
     | LONG_BREAK ->
-        let%lwt () = notify config "Starting long break" in
+        let%lwt () = notify server_config "Starting long break" in
         let%lwt new_state =
-          match%lwt sleep config !config.long_break_duration with
+          match%lwt sleep server_config !server_config.long_break_duration with
           | Pause ->
               Lwt.return LONG_BREAK
           | Reset ->
@@ -207,13 +208,13 @@ let handle_state config =
           | Complete ->
               Lwt.return WORKING
         in
-        !config.state <- new_state ;
+        !server_config.state <- new_state ;
         aux ()
   in
   aux ()
 
 (** The server which creates and registers with the socket and then listens to handle client connections *)
-let server config =
+let server server_config =
   let home = Sys.getenv "HOME" in
   let server_file = home ^ "/.ocaml-productivity-timer.sock" in
   let%lwt () =
@@ -234,34 +235,34 @@ let server config =
           | ["set"; query] -> (
             match query with
             | "pause" ->
-                Lwt_mvar.put !config.interruption Pause
+                Lwt_mvar.put !server_config.interruption Pause
             | "reset" ->
-                Lwt_mvar.put !config.interruption Reset
+                Lwt_mvar.put !server_config.interruption Reset
             | "restart" ->
-                Lwt_mvar.put !config.interruption Restart
+                Lwt_mvar.put !server_config.interruption Restart
             | "skip" ->
-                Lwt_mvar.put !config.interruption Skip
+                Lwt_mvar.put !server_config.interruption Skip
             | _ ->
                 write "Invalid keyword" )
           | ["get"; query] -> (
             match query with
             | "state" ->
-                write (state_to_string !config.state)
+                write (state_to_string !server_config.state)
             | "time_left" ->
                 write
-                  (Printf.sprintf "%d:%02d" (!config.timer / 60)
-                     (!config.timer mod 60))
+                  (Printf.sprintf "%d:%02d" (!server_config.timer / 60)
+                     (!server_config.timer mod 60))
             | "percent_left" ->
                 write
                   (string_of_int
                      (int_of_float
-                        ( float !config.timer
-                        /. float !config.session_length
+                        ( float !server_config.timer
+                        /. float !server_config.session_length
                         *. 100.0 )))
             | "sessions_complete" ->
-                write (string_of_int !config.work_sessions_completed)
+                write (string_of_int !server_config.work_sessions_completed)
             | "pause" ->
-                write (string_of_bool !config.paused)
+                write (string_of_bool !server_config.paused)
             | keyword ->
                 write ("Invalid keyword: " ^ keyword) )
           | _ ->
@@ -280,13 +281,13 @@ let stop server =
   exit 0
 
 let test_config () =
-  make_config ~work_duration:(Duration.of_min 25)
+  make_server_config ~work_duration:(Duration.of_min 25)
     ~short_break_duration:(Duration.of_min 5)
     ~long_break_duration:(Duration.of_min 30) ~number_work_sessions:3
     ~notify_script:(Some "some/script/notify") ()
   |> ref
 
-let print_config config_ref = print_endline (show_config !config_ref)
+let print_config config_ref = print_endline (show_server_config !config_ref)
 
 let%expect_test "initial config" =
   print_config @@ test_config () ;
