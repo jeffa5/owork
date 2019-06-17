@@ -1,5 +1,6 @@
 (executable
  (name main)
+ (public_name owork)
  (libraries owork_timer lwt lwt.unix sexplib duration cmdliner)
  (preprocess
   (pps lwt_ppx ppx_sexp_conv)))
