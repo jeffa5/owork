@@ -49,4 +49,4 @@ clean:
 
 .PHONY: format
 format:
-	dune build @fmt
+	dune build @fmt --auto-promote
