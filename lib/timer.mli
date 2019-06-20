@@ -1,24 +1,25 @@
-type state [@@deriving show]
+(** An interruptible timer *)
 
-type interruption = Pause | Reset | Restart | Skip
+(** Type of an interruptible timer. *)
+type t
 
-type server_config =
-  { mutable state: state [@default IDLE]
-  ; mutable paused: bool [@default true]
-  ; mutable interruption: interruption Lwt_mvar.t
-        [@opaque] [@default Lwt_mvar.create_empty ()]
-  ; mutable timer: int [@default 0]
-  ; mutable session_length: int [@default 0]
-  ; work_duration: Duration.t
-  ; short_break_duration: Duration.t
-  ; long_break_duration: Duration.t
-  ; number_work_sessions: int
-  ; notify_script: string option [@default None]
-  ; mutable work_sessions_completed: int [@default 0] }
-[@@deriving make, show]
+val create : Duration.t -> t
+(** [create d] creates a new interruptible timer with initial duration [d] *)
 
-val server : server_config ref -> Lwt_io.server Lwt.t
+val start : t -> unit
+(** [start t] starts the given timer. *)
 
-val stop : Lwt_io.server -> 'a
+val stop : t -> unit
+(** [stop t] stops the given timer. *)
 
-val handle_state : server_config ref -> 'a Lwt.t
+val set_duration : Duration.t -> t -> unit
+(** [set_duration d t] sets the duration of the given timer [t] to duration [d]. The timer will use this value on the next tick. *)
+
+val set_callback : (unit -> unit) -> t -> unit
+(** [set_callback f t] sets the notification callback for the given timer [t]. [f] is called to notify the user of the timer reaching 0. *)
+
+val time : t -> Duration.t
+(** [time t] retrieves the time remaining on timer [t]. *)
+
+val paused : t -> bool
+(** [paused t] retrieves the paused status of timer [t]. *)
