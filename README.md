@@ -11,3 +11,11 @@ cd owork
 make install
 owork --help
 ```
+
+## Socket file
+
+The default socket file is created at `/tmp/owork.sock`. This can be overridden with a command-line option.
+
+## Protocol
+
+The protocol is outlined in [PROTOCOL.md](PROTOCOL.md)
