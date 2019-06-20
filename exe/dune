@@ -1,6 +1,6 @@
 (executable
  (name main)
  (public_name owork)
- (libraries owork_timer lwt lwt.unix sexplib duration cmdliner)
+ (libraries owork lwt lwt.unix duration cmdliner logs logs.fmt logs.cli fmt.cli fmt.tty)
  (preprocess
-  (pps lwt_ppx ppx_sexp_conv)))
+  (pps lwt_ppx)))
