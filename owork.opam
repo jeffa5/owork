@@ -6,7 +6,7 @@ build: [
   ["dune" "runtest" "-p" name "-j" jobs] {with-test}
   ["dune" "build" "-p" name "@doc"] {with-doc}
 ]
-maintainer: ["Jeffas"]
+maintainer: ["Jeffas <dev@jeffas.io>"]
 authors: ["Jeffas"]
 bug-reports: "https://github.com/jeffa5/owork/issues"
 homepage: "https://github.com/jeffa5/owork"
@@ -16,4 +16,13 @@ description:
   "Owork is a productivity timer. It provides a server executable which uses a state machine to start different timers for sessions. There are four states: idle, working, short break and long break."
 depends: [
   "dune" {build & > "1.5"}
+  "astring" {>= "0.8"}
+  "cmdliner" {>= "1.0"}
+  "duration" {>= "0.1"}
+  "fmt" {>= "0.8"}
+  "logs" {>= "0.6"}
+  "lwt" {>= "4.2"}
+  "lwt_ppx" {>= "1.2"}
+  "ppx_deriving" {>= "4.3"}
+  "ppx_expect" {>= "0.12"}
 ]
