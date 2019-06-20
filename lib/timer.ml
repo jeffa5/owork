@@ -1,14 +1,16 @@
 type t =
   { mutable duration_remaining: Duration.t
   ; mutable paused: bool [@default true]
-  ; mutable next_duration: unit -> unit [@default fun () -> ()] }
+  ; mutable next_duration: unit -> unit [@default fun () -> ()]
+  ; unpause_cvar: unit Lwt_condition.t
+        [@opaque] [@default Lwt_condition.create ()] }
 [@@deriving make, show]
 
 (* Countdown the timer. When paused stop the thread and the start function will create a new countdown thread *)
 let countdown_timer t =
   let rec loop () =
     if t.paused then
-      let%lwt () = Lwt_unix.yield () in
+      let%lwt () = Lwt_condition.wait t.unpause_cvar in
       loop ()
     else if Duration.to_sec t.duration_remaining > 0 then
       let%lwt () =
@@ -35,7 +37,9 @@ let create duration =
   let _ = countdown_timer t in
   t
 
-let start t = t.paused <- false
+let start t =
+  t.paused <- false ;
+  Lwt_condition.signal t.unpause_cvar ()
 
 let stop t = t.paused <- true
 
