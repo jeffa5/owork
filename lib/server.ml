@@ -135,6 +135,12 @@ let handle_connection t config _address input_channel output_channel =
       let%lwt () = Logs_lwt.debug (fun f -> f "Received no line") in
       Lwt.return_unit
 
+let setup_signal_handlers stop_mvar =
+  let handle_fun _ = Lwt_main.run @@ Lwt_mvar.put stop_mvar () in
+  let _ = Lwt_unix.on_signal Sys.sigint handle_fun in
+  let _ = Lwt_unix.on_signal Sys.sigterm handle_fun in
+  ()
+
 let run (config : Config.t) =
   if%lwt Lwt_unix.file_exists config.socket_file then
     Logs_lwt.err (fun f -> f "Socket file already exists, exiting.")
@@ -148,10 +154,7 @@ let run (config : Config.t) =
       Lwt_io.establish_server_with_client_address socket_file
         (fun address (ic, oc) -> handle_connection t config address ic oc)
     in
-    let _ =
-      Lwt_unix.on_signal Sys.sigint (fun _ ->
-          Lwt_main.run @@ Lwt_mvar.put stop_mvar 0 )
-    in
-    let%lwt _ = Lwt_mvar.take stop_mvar in
+    setup_signal_handlers stop_mvar ;
+    let%lwt () = Lwt_mvar.take stop_mvar in
     let%lwt () = Logs_lwt.info (fun f -> f "Shutting down the server.") in
     Lwt_io.shutdown_server server
