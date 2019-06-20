@@ -13,7 +13,7 @@
 (depends (dune (and :build (> 1.5)))
 (astring (>= 0.8))
 (cmdliner (>= 1.0))
-(duration (>= 0.1)) (fmt (>= 0.8)) (logs (>= 0.6)) (lwt (>= 4.2)) (lwt_ppx ( >= 1.2 )) (ppx_deriving( >= 4.3 ) ) (ppx_expect(>= 0.12))
+(duration (>= 0.1)) (fmt (>= 0.8)) (logs (>= 0.6)) (lwt (>= 4.2)) (lwt_ppx ( >= 1.2 )) (ppx_deriving( >= 4.3 ) ) (ppx_expect :with_test)
 
 )
 (tags (productivity timer work))
