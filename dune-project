@@ -11,6 +11,7 @@
 (synopsis "A productivity timer for focusing on work")
 (description "Owork is a productivity timer. It provides a server executable which uses a state machine to start different timers for sessions. There are four states: idle, working, short break and long break.")
 (depends (dune (and :build (> 1.5)))
+    (lwt_ppx (> 1))
 )
 (tags (productivity timer work))
 )
