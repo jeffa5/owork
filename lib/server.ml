@@ -26,7 +26,7 @@ let next_session t (config : Config.t) () =
 let string_of_duration duration =
   let seconds = Duration.to_sec duration mod 60 in
   let minutes = Duration.to_min duration in
-  Printf.sprintf "%i:%i" minutes seconds
+  Printf.sprintf "%i:%02i" minutes seconds
 
 let handle_get t (config : Config.t) output_channel action =
   let send_line line =
