@@ -19,7 +19,7 @@
 (lwt (>= 4.2))
 (lwt_ppx ( >= 1.2 ))
 (ppx_deriving( >= 4.3 ) )
-(ppx_expect :with_test)
+(ppx_expect ( >= 0.12 ))
 )
 (tags (productivity timer work))
 )
