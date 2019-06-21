@@ -92,6 +92,7 @@ let handle_set t (config : Config.t) output_channel action =
   | "reset" ->
       Timer.stop t.timer ;
       t.state <- Idle ;
+      t.work_sessions_completed <- 0 ;
       Lwt.return_unit
   | "restart" ->
       ( match t.state with
