@@ -20,7 +20,7 @@ open Cmdliner
 
 let work_duration =
   let doc = "Length in minutes of the work session." in
-  Arg.(value & opt int 25 & info ["w"; "work-duration"] ~doc)
+  Arg.(value & opt int 30 & info ["w"; "work-duration"] ~doc)
 
 let short_break_duration =
   let doc = "Length in minutes of the short break." in
@@ -28,11 +28,11 @@ let short_break_duration =
 
 let long_break_duration =
   let doc = "Length in minutes of the long break." in
-  Arg.(value & opt int 30 & info ["l"; "long-break"] ~doc)
+  Arg.(value & opt int 15 & info ["l"; "long-break"] ~doc)
 
 let number_work_sessions =
   let doc = "Number of work sessions to be completed before a long break." in
-  Arg.(value & opt int 3 & info ["n"; "work-sessions"] ~doc)
+  Arg.(value & opt int 4 & info ["n"; "work-sessions"] ~doc)
 
 let notify_script =
   let doc =
