@@ -19,3 +19,7 @@ The default socket file is created at `/tmp/owork.sock`. This can be overridden 
 ## Protocol
 
 The protocol is outlined in [PROTOCOL.md](PROTOCOL.md)
+
+## Examples
+
+Some example client scripts to interact with the server can be found in the `examples` directory.
