@@ -74,15 +74,4 @@ module Test = struct
     print_timer timer ;
     [%expect {| { Timer.duration_remaining = ; paused = false } |}]
 
-  let%expect_test "timer does count down" =
-    let timer = create (Duration.of_sec 5) in
-    print_timer timer ;
-    let _ = start timer in
-    let promise = Lwt_unix.sleep 1.0 in
-    Lwt_main.run promise ;
-    print_timer timer ;
-    [%expect
-      {|
-      { Timer.duration_remaining = 5 seconds ; paused = true }
-      { Timer.duration_remaining = 4 seconds ; paused = false } |}]
 end
