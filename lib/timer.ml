@@ -58,8 +58,7 @@ module Test = struct
   let%expect_test "create new timer" =
     let timer = create (Duration.of_min 25) in
     print_timer timer ;
-    [%expect
-      {|
+    [%expect {|
       { Timer.duration_remaining = 25 minutes ; paused = true;
         next_duration = <fun>; unpause_cvar = <opaque> } |}]
 
@@ -67,8 +66,7 @@ module Test = struct
     let timer = create (Duration.of_min 25) in
     start timer ;
     print_timer timer ;
-    [%expect
-      {|
+    [%expect {|
       { Timer.duration_remaining = 25 minutes ; paused = false;
         next_duration = <fun>; unpause_cvar = <opaque> } |}]
 
@@ -77,8 +75,7 @@ module Test = struct
     start timer ;
     stop timer ;
     print_timer timer ;
-    [%expect
-      {|
+    [%expect {|
       { Timer.duration_remaining = 25 minutes ; paused = true;
         next_duration = <fun>; unpause_cvar = <opaque> } |}]
 
@@ -87,22 +84,8 @@ module Test = struct
     start timer ;
     stop timer ;
     print_timer timer ;
-    [%expect
-      {|
+    [%expect {|
       { Timer.duration_remaining = ; paused = true; next_duration = <fun>;
         unpause_cvar = <opaque> } |}]
 
-  let%expect_test "timer does count down" =
-    let timer = create (Duration.of_sec 5) in
-    print_timer timer ;
-    let _ = start timer in
-    let promise = Lwt_unix.sleep 1.0 in
-    Lwt_main.run promise ;
-    print_timer timer ;
-    [%expect
-      {|
-      { Timer.duration_remaining = 5 seconds ; paused = true;
-        next_duration = <fun>; unpause_cvar = <opaque> }
-      { Timer.duration_remaining = 4 seconds ; paused = false;
-        next_duration = <fun>; unpause_cvar = <opaque> } |}]
 end
