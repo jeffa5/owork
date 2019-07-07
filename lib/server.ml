@@ -63,7 +63,7 @@ let handle_get t (config : Config.t) output_channel action =
       | Long_break ->
           percentage (Timer.time t.timer) config.long_break_duration )
   | _ ->
-      Printf.sprintf "Error, action get/%s not supported." action
+      Printf.sprintf "Error: action get/%s not supported." action
 
 let handle_set t (config : Config.t) output_channel action =
   match action with
@@ -109,7 +109,7 @@ let handle_set t (config : Config.t) output_channel action =
       next_session t config () ; Timer.start t.timer ; Lwt.return_unit
   | _ ->
       Lwt_io.write_line output_channel
-        (Printf.sprintf "Error, action set/%s not supported" action)
+        (Printf.sprintf "Error: action set/%s not supported" action)
 
 let handle_connection t config _address input_channel output_channel =
   let%lwt () = Logs_lwt.info (fun f -> f "Connection received") in
