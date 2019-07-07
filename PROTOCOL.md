@@ -17,81 +17,21 @@ get/time
 
 ## Set requests
 
-### Start
-
-Start the timer.
-```
-set/start
-```
-
-### Stop
-
-Stop the timer.
-```
-set/stop
-```
-
-### Toggle
-
-Toggle the start/stop state of the timer.
-```
-set/toggle
-```
-
-### Reset
-
-Reset the sessions, going back to the `IDLE` state.
-```
-set/toggle
-```
-
-### Restart
-
-Restart the current session.
-```
-set/restart
-```
-
-### Skip
-
-Skip the current session.
-```
-set/skip
-```
+| Query | Detail |
+|---|---|
+| `set/start` | Start the timer |
+| `set/stop` | Stop the timer |
+| `set/toggle` | Toggle the start/stop state of the timer |
+| `set/reset` | Reset the sessions, going back to the `IDLE` state |
+| `set/restart` | Restart the current session|
+| `set/skip` | Skip the current session |
 
 ## Get requests
 
-### Time
-
-Get the time remaining in the current session.
-```
-get/time
-```
-
-### State
-
-Get the current state.
-```
-get/state
-```
-
-### Completed
-
-Get the number of work sessions completed.
-```
-get/completed
-```
-
-### Paused
-
-Get whether the timer is paused or not.
-```
-get/paused
-```
-
-### Percentage
-
-Get the percentage of the session remaining.
-```
-get/percentage
-```
+| Query | Detail |
+|---|---|
+| `get/time` | Get the time remaining in the current session |
+| `get/state` | Get the current state |
+| `get/completed` | Get the number of work sessions completed |
+| `get/paused` | Get whether the timer is paused or not |
+| `get/percentage` | Get the percentage of the session remaining |
