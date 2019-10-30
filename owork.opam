@@ -10,6 +10,7 @@ maintainer: ["Jeffas <dev@jeffas.io>"]
 authors: ["Jeffas"]
 bug-reports: "https://github.com/jeffa5/owork/issues"
 homepage: "https://github.com/jeffa5/owork"
+doc: "https://jeffa5.github.io/owork"
 dev-repo: "git+https://github.com/jeffa5/owork.git"
 synopsis: "A productivity timer for focusing on work"
 description:
