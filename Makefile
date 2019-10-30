@@ -50,3 +50,8 @@ clean:
 .PHONY: format
 format:
 	dune build @fmt --auto-promote
+
+.PHONY: doc
+doc:
+	dune build @doc
+	mv _build/default/_doc/_html/ docs/
