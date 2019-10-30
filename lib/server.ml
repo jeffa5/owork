@@ -26,7 +26,9 @@ let next_session t (config : Config.t) () =
 let string_of_duration duration =
   let seconds = Duration.to_sec duration mod 60 in
   let minutes = Duration.to_min duration in
-  Printf.sprintf "%i:%02i" minutes seconds
+  let s = Printf.sprintf "%i:%02i" minutes seconds in
+  Logs.debug (fun f -> f "%s" s);
+  s
 
 let handle_get t (config : Config.t) output_channel action =
   let send_line line =
@@ -112,7 +114,7 @@ let handle_set t (config : Config.t) output_channel action =
         (Printf.sprintf "Error: action set/%s not supported" action)
 
 let handle_connection t config _address input_channel output_channel =
-  let%lwt () = Logs_lwt.info (fun f -> f "Connection received") in
+  let%lwt () = Logs_lwt.debug (fun f -> f "Connection received") in
   match%lwt Lwt_io.read_line_opt input_channel with
   | Some line -> (
       let%lwt () = Logs_lwt.debug (fun f -> f "Received: %s" line) in

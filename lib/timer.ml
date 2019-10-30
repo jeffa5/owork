@@ -59,7 +59,7 @@ module Test = struct
     let timer = create (Duration.of_min 25) in
     print_timer timer ;
     [%expect {|
-      { Timer.duration_remaining = 25 minutes ; paused = true;
+      { Timer.duration_remaining = 25 minutes; paused = true;
         next_duration = <fun>; unpause_cvar = <opaque> } |}]
 
   let%expect_test "start timer" =
@@ -67,7 +67,7 @@ module Test = struct
     start timer ;
     print_timer timer ;
     [%expect {|
-      { Timer.duration_remaining = 25 minutes ; paused = false;
+      { Timer.duration_remaining = 25 minutes; paused = false;
         next_duration = <fun>; unpause_cvar = <opaque> } |}]
 
   let%expect_test "pause timer" =
@@ -76,7 +76,7 @@ module Test = struct
     stop timer ;
     print_timer timer ;
     [%expect {|
-      { Timer.duration_remaining = 25 minutes ; paused = true;
+      { Timer.duration_remaining = 25 minutes; paused = true;
         next_duration = <fun>; unpause_cvar = <opaque> } |}]
 
   let%expect_test "timer created with 0 time" =

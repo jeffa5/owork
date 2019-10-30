@@ -1,0 +1,13 @@
+lib: [
+  "_build/install/default/lib/owork/META"
+  "_build/install/default/lib/owork/dune-package"
+  "_build/install/default/lib/owork/opam"
+]
+bin: [
+  "_build/install/default/bin/owork"
+]
+doc: [
+  "_build/install/default/doc/owork/CHANGES.md"
+  "_build/install/default/doc/owork/LICENSE"
+  "_build/install/default/doc/owork/README.md"
+]
