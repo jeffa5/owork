@@ -5,6 +5,7 @@
 (authors "Jeffas")
 (maintainers "Jeffas <dev@jeffas.io>")
 (source (github jeffa5/owork))
+(documentation "https://jeffa5.github.io/owork")
 
 (package
 (name owork)
