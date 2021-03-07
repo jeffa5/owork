@@ -1,3 +1,5 @@
+open Lwt.Syntax
+
 (** Given the command line arguments create the config and start the server before handling the state *)
 let main work_duration short_break_duration long_break_duration
     number_work_sessions notify_script socket_file style_renderer log_level =
@@ -13,7 +15,7 @@ let main work_duration short_break_duration long_break_duration
       ~number_work_sessions ~notify_script ~socket_file
   in
   Lwt_main.run
-    (let%lwt () = Logs_lwt.debug (fun f -> f "%s" (Config.show config)) in
+    (let* () = Logs_lwt.debug (fun f -> f "%s" (Config.show config)) in
      Server.run config)
 
 open Cmdliner

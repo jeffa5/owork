@@ -4,4 +4,4 @@
  (inline_tests
   (flags -show-counts -strict))
  (preprocess
-  (pps ppx_expect lwt_ppx ppx_deriving.std)))
+  (pps ppx_expect ppx_deriving.std)))

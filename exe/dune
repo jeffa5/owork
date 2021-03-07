@@ -1,7 +1,14 @@
 (executable
  (name main)
  (public_name owork)
- (libraries owork lwt lwt.unix duration cmdliner logs logs.fmt logs.cli
-   fmt.cli fmt.tty)
- (preprocess
-  (pps lwt_ppx)))
+ (libraries
+  owork
+  lwt
+  lwt.unix
+  duration
+  cmdliner
+  logs
+  logs.fmt
+  logs.cli
+  fmt.cli
+  fmt.tty))

@@ -1,3 +1,5 @@
+open Lwt.Syntax
+
 type t =
   { mutable state: State.t [@default State.Idle]
   ; mutable timer: Timer.t [@default Timer.create (Duration.of_sec 0)]
@@ -32,7 +34,7 @@ let string_of_duration duration =
 
 let handle_get t (config : Config.t) output_channel action =
   let send_line line =
-    let%lwt () = Lwt_io.write_line output_channel line in
+    let* () = Lwt_io.write_line output_channel line in
     Lwt_io.flush output_channel
   in
   send_line
@@ -114,10 +116,11 @@ let handle_set t (config : Config.t) output_channel action =
         (Printf.sprintf "Error: action set/%s not supported" action)
 
 let handle_connection t config _address input_channel output_channel =
-  let%lwt () = Logs_lwt.debug (fun f -> f "Connection received") in
-  match%lwt Lwt_io.read_line_opt input_channel with
+  let* () = Logs_lwt.debug (fun f -> f "Connection received") in
+  let* line = Lwt_io.read_line_opt input_channel in
+  match line with
   | Some line -> (
-      let%lwt () = Logs_lwt.debug (fun f -> f "Received: %s" line) in
+      let* () = Logs_lwt.debug (fun f -> f "Received: %s" line) in
       match Astring.String.cut ~sep:"/" line with
       | Some ("set", action) ->
           handle_set t config output_channel action
@@ -125,17 +128,17 @@ let handle_connection t config _address input_channel output_channel =
           handle_get t config output_channel action
       | _ ->
           (* Send some error back, potentially via the notification script. *)
-          let%lwt () =
+          let* () =
             Logs_lwt.warn (fun f ->
                 f "Received invalid request, terminating connection: %s" line
             )
           in
-          let%lwt () =
+          let* () =
             Lwt_io.write_line output_channel ("Invalid request: " ^ line)
           in
           Lwt_io.flush output_channel )
   | None ->
-      let%lwt () = Logs_lwt.debug (fun f -> f "Received no line") in
+      let* () = Logs_lwt.debug (fun f -> f "Received no line") in
       Lwt.return_unit
 
 let setup_signal_handlers stop_mvar =
@@ -145,19 +148,20 @@ let setup_signal_handlers stop_mvar =
   ()
 
 let run (config : Config.t) =
-  if%lwt Lwt_unix.file_exists config.socket_file then
+  let* socket_exists = Lwt_unix.file_exists config.socket_file in
+  if socket_exists then
     Logs_lwt.err (fun f -> f "Socket file already exists, exiting.")
   else
     let socket_file = Unix.ADDR_UNIX config.socket_file in
     let stop_mvar = Lwt_mvar.create_empty () in
-    let%lwt () = Logs_lwt.info (fun f -> f "Starting server") in
+    let* () = Logs_lwt.info (fun f -> f "Starting server") in
     let t = make () in
     Timer.set_callback (next_session t config) t.timer ;
-    let%lwt server =
+    let* server =
       Lwt_io.establish_server_with_client_address socket_file
         (fun address (ic, oc) -> handle_connection t config address ic oc)
     in
     setup_signal_handlers stop_mvar ;
-    let%lwt () = Lwt_mvar.take stop_mvar in
-    let%lwt () = Logs_lwt.info (fun f -> f "Shutting down the server.") in
+    let* () = Lwt_mvar.take stop_mvar in
+    let* () = Logs_lwt.info (fun f -> f "Shutting down the server.") in
     Lwt_io.shutdown_server server

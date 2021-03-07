@@ -1,3 +1,5 @@
+open Lwt.Syntax
+
 type t =
   { mutable duration_remaining: Duration.t
   ; mutable paused: bool [@default true]
@@ -10,24 +12,24 @@ type t =
 let countdown_timer t =
   let rec loop () =
     if t.paused then
-      let%lwt () = Lwt_condition.wait t.unpause_cvar in
+      let* () = Lwt_condition.wait t.unpause_cvar in
       loop ()
     else if Duration.to_sec t.duration_remaining > 0 then
-      let%lwt () =
+      let* () =
         Logs_lwt.debug (fun f ->
             f "Tick: %s" (string_of_int (Duration.to_sec t.duration_remaining))
         )
       in
-      let%lwt () = Lwt_unix.sleep 1. in
+      let* () = Lwt_unix.sleep 1. in
       let new_time =
         Duration.of_sec (Duration.to_sec t.duration_remaining - 1)
       in
-      let%lwt () = Lwt.return @@ (t.duration_remaining <- new_time) in
+      let* () = Lwt.return @@ (t.duration_remaining <- new_time) in
       loop ()
     else (
       (* Call the callback to reset the duration for the next session *)
       t.next_duration () ;
-      let%lwt () = Lwt_unix.yield () in
+      let* () = Lwt_unix.yield () in
       loop () )
   in
   loop ()
