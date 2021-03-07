@@ -142,7 +142,7 @@ let handle_connection t config _address input_channel output_channel =
       Lwt.return_unit
 
 let setup_signal_handlers stop_mvar =
-  let handle_fun _ = Lwt_main.run @@ Lwt_mvar.put stop_mvar () in
+  let handle_fun _ = Lwt.async (Lwt_mvar.put stop_mvar) in
   let _ = Lwt_unix.on_signal Sys.sigint handle_fun in
   let _ = Lwt_unix.on_signal Sys.sigterm handle_fun in
   ()
