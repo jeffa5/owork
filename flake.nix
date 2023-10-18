@@ -2,71 +2,55 @@
   description = "owork";
 
   inputs = {
-    flake-utils = {
-      url = "github:numtide/flake-utils";
-      inputs.nixpkgs.follows = "nixpkgs";
-    };
+    nixpkgs.url = "github:NixOS/nixpkgs/nixos-unstable";
   };
 
-  outputs = { self, nixpkgs, flake-utils }:
-    flake-utils.lib.eachDefaultSystem
-      (system:
-        let
-          pkgs = import nixpkgs {
-            system = system;
-          };
-        in
-        rec
-        {
-          packages = {
-            owork = pkgs.ocamlPackages.buildDunePackage {
-              pname = "owork";
-              version = "0.1.0";
-              src = ./.;
-              useDune2 = true;
-              buildInputs = with pkgs.ocamlPackages; [
-                lwt
-                fmt
-                logs
-                cmdliner
-                duration
-                ppx_expect
-                ppx_deriving
-                astring
-              ];
-            };
-          };
+  outputs = {
+    self,
+    nixpkgs,
+  }: let
+    system = "x86_64-linux";
+    pkgs = import nixpkgs {
+      inherit system;
+    };
+  in {
+    packages.${system} = {
+      owork = pkgs.ocamlPackages.buildDunePackage {
+        pname = "owork";
+        version = "0.1.0";
+        src = ./.;
+        useDune2 = true;
+        buildInputs = with pkgs.ocamlPackages; [
+          lwt
+          fmt
+          logs
+          cmdliner
+          duration
+          ppx_expect
+          ppx_deriving
+          astring
+        ];
+      };
+    };
 
-          defaultPackage = packages.owork;
+    overlays.default = _final: _prev: self.packages.${system};
 
-          apps = {
-            owork = flake-utils.lib.mkApp {
-              drv = packages.owork;
-            };
-          };
-
-          defaultApp = apps.owork;
-
-          devShell =
-            pkgs.mkShell {
-              buildInputs = with pkgs; [
-                ocaml
-                (with ocamlPackages; [
-                  dune_2
-                  astring
-                  cmdliner
-                  duration
-                  fmt
-                  logs
-                  lwt
-                  ppx_deriving
-                  ppx_expect
-                  findlib
-                ])
-
-                nixpkgs-fmt
-                rnix-lsp
-              ];
-            };
-        });
+    devShells.${system}.default = pkgs.mkShell {
+      buildInputs = with pkgs; [
+        ocaml
+        (with ocamlPackages; [
+          dune_2
+          astring
+          cmdliner
+          duration
+          fmt
+          logs
+          lwt
+          ppx_deriving
+          ppx_expect
+          findlib
+        ])
+      ];
+    };
+  };
 }
